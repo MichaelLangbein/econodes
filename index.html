@@ -15,11 +15,45 @@
         width: 100%;
         height: 100vh;
       }
+      .widget {
+        padding: 0.5rem;
+        margin: 0.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid lightgrey;
+
+        label {
+          margin-right: 0.5rem;
+        }
+      }
+      #formList {
+        display: flex;
+        flex-direction: row;
+      }
     </style>
   </head>
   <body>
     <div id="app">
       <h1>EcoNodes</h1>
+
+      <div id="formList">
+        <div id="nodeForm" class="widget">
+          <form action="">
+            <h4>Node</h4>
+            <div><label for="">Label:</label><input type="text" name="" id="" /></div>
+            <div><label for="">Value:</label><input type="number" name="" id="" /></div>
+            <button type="submit">OK</button>
+          </form>
+        </div>
+
+        <div id="edgeForm" class="widget">
+          <form action="">
+            <h4>Edge</h4>
+            <div><label for="">Label:</label><input type="text" name="" id="" /></div>
+            <div><label for="">Value:</label><input type="number" name="" id="" /></div>
+            <button type="submit">OK</button>
+          </form>
+        </div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

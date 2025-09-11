@@ -37,6 +37,49 @@ const data: Graph = {
 };
 
 /**********************************************
+ * State Management
+ **********************************************/
+
+interface Event {
+  type: 'init' | 'createNode' | 'editNode' | 'createEdge' | 'editEdge' | 'dragNode' | 'saveState';
+  payload: any;
+}
+
+interface AppState {
+  data: Graph;
+  selected: Node | Edge | undefined;
+}
+
+const appState: AppState = {
+  data,
+  selected: undefined,
+};
+
+function updateApp(event: Event) {
+  // step 1: change state
+  switch (event.type) {
+    case 'init':
+    case 'createEdge':
+    case 'createNode':
+    case 'dragNode':
+    case 'editEdge':
+    case 'editNode':
+    default:
+      break;
+  }
+
+  // step 2: given state, update app
+  drawGraph(appState.data, rootSvg);
+}
+
+/**********************************************
+ * Form setting and reading
+ **********************************************/
+
+const nodeForm = select('#nodeForm');
+const edgeForm = select('#edgeForm');
+
+/**********************************************
  * SVG Setup
  **********************************************/
 
@@ -66,7 +109,7 @@ defs
   .attr('d', 'M 0 0 L 10 5 L 0 10 z');
 
 /**********************************************
- * DRAWING
+ * Drawing functions
  **********************************************/
 
 function getNodeById(graph: Graph, id: number) {
@@ -159,8 +202,11 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
   return { nodes, nodeLabels, connections, connectionLabel };
 }
 
-drawGraph(data, rootSvg);
-console.log('done');
+/**********************************************
+ * Run app
+ **********************************************/
+
+updateApp({ type: 'init', payload: undefined });
 
 // allow dragging nodes
 // allow creating nodes
