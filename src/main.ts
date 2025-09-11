@@ -1,6 +1,10 @@
 import { select, type Selection } from 'd3-selection';
 import { scaleLinear } from 'd3-scale';
 
+/**********************************************
+ * DATA
+ **********************************************/
+
 interface Node {
   id: number;
   x: number; // between 0 and 1
@@ -32,15 +36,70 @@ const data: Graph = {
   ],
 };
 
+/**********************************************
+ * SVG Setup
+ **********************************************/
+
 const rootElement = select('#app');
 
-const rootSvg = rootElement.append('svg').attr('width', '600px').attr('height', '500px').attr('viewBox', '0 0 500 500');
+const viewBoxX = 500;
+const viewBoxY = 500;
+const xScale = scaleLinear([0, 1], [0, viewBoxX]);
+const yScale = scaleLinear([0, 1], [0, viewBoxY]);
 
-const xScale = scaleLinear([0, 1], [0, 500]); // parseInt(rootSvg.attr('width'))]);
-const yScale = scaleLinear([0, 1], [0, 500]); // parseInt(rootSvg.attr('height'))]);
+const rootSvg = rootElement
+  .append('svg')
+  .attr('width', '600px')
+  .attr('height', '500px')
+  .attr('viewBox', `0 0 ${viewBoxX} ${viewBoxY}`);
+const defs = rootSvg.append('defs');
+defs
+  .append('marker')
+  .attr('id', 'arrow')
+  .attr('viewBox', '0 0 10 10')
+  .attr('refX', '5')
+  .attr('refY', '5')
+  .attr('markerWidth', '6')
+  .attr('markerHeight', '6')
+  .attr('orient', 'auto-start-reverse')
+  .append('path')
+  .attr('d', 'M 0 0 L 10 5 L 0 10 z');
+
+/**********************************************
+ * DRAWING
+ **********************************************/
 
 function getNodeById(graph: Graph, id: number) {
   return graph.nodes.find((n) => n.id === id)!;
+}
+
+function xFractionOfWay(graph: Graph, startId: number, targetId: number, fraction: number) {
+  const startNode = getNodeById(graph, startId);
+  const targetNode = getNodeById(graph, targetId);
+  const startX = xScale(startNode.x);
+  const startY = yScale(startNode.y);
+  const targetX = xScale(targetNode.x);
+  const targetY = yScale(targetNode.y);
+  const fractionX = startX + fraction * (targetX - startX);
+  const fractionY = startY + fraction * (targetY - startY);
+  return { x: fractionX, y: fractionY };
+}
+
+function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer: number) {
+  const startNode = getNodeById(graph, startId);
+  const targetNode = getNodeById(graph, targetId);
+  const startX = xScale(startNode.x);
+  const startY = yScale(startNode.y);
+  const targetX = xScale(targetNode.x);
+  const targetY = yScale(targetNode.y);
+  const deltaX = targetX - startX;
+  const deltaY = targetY - startY;
+  const distanceTotal = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+  const distanceReduced = distanceTotal - buffer;
+  const fractionOfWay = distanceReduced / distanceTotal;
+  const fractionX = startX + deltaX * fractionOfWay;
+  const fractionY = startY + deltaY * fractionOfWay;
+  return { x: fractionX, y: fractionY };
 }
 
 function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTMLElement, any>) {
@@ -52,9 +111,10 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .attr('class', 'connection')
     .attr('x1', (edge) => xScale(getNodeById(graph, edge.source).x))
     .attr('y1', (edge) => yScale(getNodeById(graph, edge.source).y))
-    .attr('x2', (edge) => xScale(getNodeById(graph, edge.target).x))
-    .attr('y2', (edge) => yScale(getNodeById(graph, edge.target).y))
+    .attr('x2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).x)
+    .attr('y2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).y)
     .attr('stroke', 'black')
+    .attr('marker-end', 'url(#arrow)')
     .exit()
     .remove();
 
