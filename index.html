@@ -28,6 +28,7 @@
       #formList {
         display: flex;
         flex-direction: row;
+        height: 150px;
       }
     </style>
   </head>
@@ -36,22 +37,14 @@
       <h1>EcoNodes</h1>
 
       <div id="formList">
+        <button id="nodeCreate">Create node</button>
         <div id="nodeForm" class="widget">
-          <form action="">
-            <h4>Node</h4>
-            <div><label for="">Label:</label><input type="text" name="" id="" /></div>
-            <div><label for="">Value:</label><input type="number" name="" id="" /></div>
-            <button type="submit">OK</button>
-          </form>
-        </div>
-
-        <div id="edgeForm" class="widget">
-          <form action="">
-            <h4>Edge</h4>
-            <div><label for="">Label:</label><input type="text" name="" id="" /></div>
-            <div><label for="">Value:</label><input type="number" name="" id="" /></div>
-            <button type="submit">OK</button>
-          </form>
+          <h4>Node</h4>
+          <div><label for="label">Label:</label><input type="text" name="label" id="label" /></div>
+          <div><label for="">Value:</label><input type="number" name="value" id="value" /></div>
+          <button class="nodeUpdate">OK</button>
+          <button class="nodeDelete">Delete</button>
+          <button class="nodeDeselect">Deselect</button>
         </div>
       </div>
     </div>
