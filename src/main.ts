@@ -10,7 +10,7 @@ interface Node {
   x: number; // between 0 and 1
   y: number; // between 0 and 1
   label: string;
-  value: number;
+  value: string;
 }
 
 interface Edge {
@@ -23,31 +23,84 @@ interface Graph {
   edges: Edge[];
 }
 
-function isNode(node: any): node is Node {
-  return typeof node === 'object' && Object.hasOwn(node, 'id') && Object.hasOwn(node, 'value');
-}
-
-function isEdge(edge: any): edge is Edge {
-  return (
-    typeof edge === 'object' &&
-    Object.hasOwn(edge, 'source') &&
-    Object.hasOwn(edge, 'target') &&
-    typeof edge.source === 'number' &&
-    typeof edge.target === 'number'
-  );
-}
-
 const data: Graph = {
   nodes: [
-    { id: 1, x: 0.5, y: 0.25, label: 'A', value: 1 },
-    { id: 2, x: 0.25, y: 0.75, label: 'B', value: 2 },
-    { id: 3, x: 0.75, y: 0.75, label: 'C', value: 3 },
+    { id: 1, x: 0.5, y: 0.25, label: 'A', value: '1' },
+    { id: 2, x: 0.25, y: 0.75, label: 'B', value: '2' },
+    { id: 3, x: 0.75, y: 0.75, label: 'C', value: '3' },
   ],
   edges: [
     { source: 1, target: 2 },
     { source: 2, target: 3 },
   ],
 };
+
+function updateNode(updatedNode: Node, graph: Graph) {
+  const originalNode = graph.nodes.find((n) => n.id === updatedNode.id)!;
+
+  // if label change, update all nodes value-expressions to match
+  for (const node of graph.nodes) {
+    if (node.value.includes(originalNode.label)) {
+      node.value.replace(originalNode.label, updatedNode.label);
+    }
+  }
+
+  // if value change, check that references exist and update edges
+  updateEdges(graph);
+}
+
+function extractLabels(valueString: string): string[] {
+  const labels = [];
+  let currentLabel: string | undefined = undefined;
+  for (const currentChar of valueString) {
+    if (currentChar === '"') {
+      if (currentLabel === undefined) {
+        currentLabel = '';
+      } else {
+        labels.push(currentLabel);
+        currentLabel = undefined;
+      }
+    } else {
+      if (currentLabel !== undefined) currentLabel += currentChar;
+    }
+  }
+  return labels;
+}
+
+function substitute(valueString: string, matches: { [key: string]: number }) {
+  const parts = valueString.split('"');
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part in matches) {
+      parts[i] = matches[part] + '';
+    }
+  }
+  const substituted = parts.join();
+  return substituted;
+}
+
+function updateEdges(graph: Graph) {
+  graph.edges = [];
+  for (const targetNode of graph.nodes) {
+    const labels = extractLabels(targetNode.value);
+    for (const label of labels) {
+      const sourceNode = graph.nodes.find((n) => n.label === label);
+      if (sourceNode) graph.edges.push({ source: sourceNode.id, target: targetNode.id });
+    }
+  }
+}
+
+function evaluateValueString(valueString: string, graph: Graph): number {
+  const labels = extractLabels(valueString);
+  const matchedValues: { [key: string]: number } = {};
+  for (const label of labels) {
+    const valueString = graph.nodes.find((n) => n.label === label)!.value;
+    matchedValues[label] = evaluateValueString(valueString, graph);
+  }
+  const subsitutedString = substitute(valueString, matchedValues);
+  const evaluated: number = eval(subsitutedString);
+  return evaluated;
+}
 
 /**********************************************
  * State Management
@@ -62,15 +115,12 @@ type Event =
 
 interface AppState {
   data: Graph;
-  selected: Node | Edge | undefined;
+  selected: Node | undefined;
 }
 
-function isSelected(element: Node | Edge) {
+function isSelected(node: Node) {
   if (!appState.selected) return false;
-  if (isEdge(element) && isEdge(appState.selected))
-    return element.source === appState.selected.source && element.target === appState.selected.target;
-  if (isNode(element) && isNode(appState.selected)) return element.id === appState.selected.id;
-  return false;
+  return node.id === appState.selected.id;
 }
 
 const appState: AppState = {
@@ -125,25 +175,26 @@ function updateApp(event: Event) {
  **********************************************/
 
 function drawNodeForm(selected: AppState['selected']) {
-  if (!selected || !isNode(selected)) {
+  if (!selected) {
     const nodeForm = select('#nodeForm');
-    nodeForm.style('display', 'none');
+    nodeForm.style('opacity', '0');
     return;
   }
   const nodeForm = select('#nodeForm');
-  nodeForm.style('display', 'block');
+  nodeForm.style('opacity', '1');
   nodeForm.select('input[name="label"]').property('value', selected.label);
   nodeForm.select('input[name="value"]').property('value', selected.value);
   nodeForm.select('button.nodeUpdate').on('click', () => {
     const newNode = { ...selected };
     const nodeForm = select('#nodeForm');
     newNode.label = nodeForm.select('input[name="label"]').property('value');
-    newNode.value = +nodeForm.select('input[name="value"]').property('value');
+    newNode.value = nodeForm.select('input[name="value"]').property('value');
     updateApp({ type: 'updateNode', node: newNode });
   });
   nodeForm.select('button.nodeDelete').on('click', () => {
     updateApp({ type: 'deleteNode', node: selected });
   });
+  nodeForm.select('button.nodeDeselect').on('click', () => updateApp({ type: 'selectNode', node: undefined }));
 }
 
 select('#nodeCreate').on('click', () =>
@@ -152,7 +203,7 @@ select('#nodeCreate').on('click', () =>
     node: {
       id: Math.max(...appState.data.nodes.map((n) => n.id)) + 1,
       label: 'New node',
-      value: 1,
+      value: '1',
       x: 0.5,
       y: 0.5,
     },
@@ -194,18 +245,6 @@ defs
 
 function getNodeById(graph: Graph, id: number) {
   return graph.nodes.find((n) => n.id === id)!;
-}
-
-function xFractionOfWay(graph: Graph, startId: number, targetId: number, fraction: number) {
-  const startNode = getNodeById(graph, startId);
-  const targetNode = getNodeById(graph, targetId);
-  const startX = xScale(startNode.x);
-  const startY = yScale(startNode.y);
-  const targetX = xScale(targetNode.x);
-  const targetY = yScale(targetNode.y);
-  const fractionX = startX + fraction * (targetX - startX);
-  const fractionY = startY + fraction * (targetY - startY);
-  return { x: fractionX, y: fractionY };
 }
 
 function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer: number) {
@@ -254,7 +293,8 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .attr('stroke', (d) => (isSelected(d) ? 'black' : 'none'))
     .attr('cx', (d) => xScale(d.x))
     .attr('cy', (d) => yScale(d.y))
-    .on('click', (event, node) => updateApp({ type: 'selectNode', node }));
+    .on('click', (_, node) => updateApp({ type: 'selectNode', node }))
+    .on('drag', (evt, _) => console.log(evt));
   nodes.exit().remove();
 
   const nodeLabels = rootSvg
@@ -267,7 +307,8 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .attr('class', 'nodeLabel')
     .text((el) => el.label)
     .attr('x', (d) => xScale(d.x))
-    .attr('y', (d) => yScale(d.y));
+    .attr('y', (d) => yScale(d.y))
+    .on('click', (_, node) => updateApp({ type: 'selectNode', node }));
   nodeLabels.exit().remove();
 }
 
