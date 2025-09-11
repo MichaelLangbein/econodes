@@ -44,8 +44,8 @@ const data: Graph = {
     { id: 3, x: 0.75, y: 0.75, label: 'C', value: 3 },
   ],
   edges: [
-    { source: 1, target: 2, label: 'A to B' },
-    { source: 2, target: 3, label: 'B to C' },
+    { source: 1, target: 2 },
+    { source: 2, target: 3 },
   ],
 };
 
@@ -93,15 +93,19 @@ function updateApp(event: Event) {
           appState.data.nodes[i] = event.node;
         }
       }
+      appState.selected = undefined;
       break;
 
     case 'deleteNode':
       appState.data.nodes = appState.data.nodes.filter((d) => d.id !== event.node.id);
       appState.data.edges = appState.data.edges.filter((e) => e.target !== event.node.id);
+      appState.data.edges = appState.data.edges.filter((e) => e.source !== event.node.id);
+      appState.selected = undefined;
       break;
 
     case 'createNode':
       appState.data.nodes.push(event.node);
+      appState.selected = event.node;
       break;
 
     case 'init':
@@ -113,18 +117,7 @@ function updateApp(event: Event) {
   drawGraph(appState.data, rootSvg);
   drawNodeForm(appState.selected);
 
-  // step 3: post effects
-  switch (event.type) {
-    case 'updateNode':
-    case 'deleteNode':
-      setTimeout(() => updateApp({ type: 'selectNode', node: undefined }));
-      break;
-    case 'createNode':
-      setTimeout(() => updateApp({ type: 'selectNode', node: event.node }));
-      break;
-    default:
-      break;
-  }
+  console.log(appState);
 }
 
 /**********************************************
@@ -157,7 +150,7 @@ select('#nodeCreate').on('click', () =>
   updateApp({
     type: 'createNode',
     node: {
-      id: appState.data.nodes.length,
+      id: Math.max(...appState.data.nodes.map((n) => n.id)) + 1,
       label: 'New node',
       value: 1,
       x: 0.5,
@@ -234,8 +227,9 @@ function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer:
 
 function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTMLElement, any>) {
   const connections = rootSvg
-    .selectAll('.connection')
-    .data(graph.edges)
+    .selectAll<SVGLineElement, Edge>('.connection')
+    .data(graph.edges, (e) => `${e.source}->${e.target}`);
+  connections
     .enter()
     .append('line')
     .attr('class', 'connection')
@@ -244,14 +238,14 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .attr('x2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).x)
     .attr('y2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).y)
     .attr('stroke', 'black')
-    .attr('marker-end', 'url(#arrow)')
-    .exit()
-    .remove();
+    .attr('marker-end', 'url(#arrow)');
+  connections.exit().remove();
 
   const nodes = rootSvg
     .selectAll<SVGCircleElement, Node>('.node')
     .data(graph.nodes, (d: Node) => d.id)
-    .attr('stroke', (d) => (isSelected(d) ? 'black' : 'none'))
+    .attr('stroke', (d) => (isSelected(d) ? 'black' : 'none'));
+  nodes
     .enter()
     .append('circle')
     .attr('class', 'node')
@@ -260,22 +254,21 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .attr('stroke', (d) => (isSelected(d) ? 'black' : 'none'))
     .attr('cx', (d) => xScale(d.x))
     .attr('cy', (d) => yScale(d.y))
-    .on('click', (event, node) => updateApp({ type: 'selectNode', node }))
-    .exit()
-    .remove();
+    .on('click', (event, node) => updateApp({ type: 'selectNode', node }));
+  nodes.exit().remove();
 
   const nodeLabels = rootSvg
     .selectAll<SVGTextElement, Node>('.nodeLabel')
     .data(graph.nodes, (d) => d.id)
-    .text((el) => el.label)
+    .text((el) => el.label);
+  nodeLabels
     .enter()
     .append('text')
     .attr('class', 'nodeLabel')
     .text((el) => el.label)
     .attr('x', (d) => xScale(d.x))
-    .attr('y', (d) => yScale(d.y))
-    .exit()
-    .remove();
+    .attr('y', (d) => yScale(d.y));
+  nodeLabels.exit().remove();
 }
 
 /**********************************************
