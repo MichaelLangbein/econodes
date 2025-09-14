@@ -128,7 +128,9 @@ type Event =
   | { type: 'moveNode'; node: Node }
   | { type: 'updateNode'; node: Node }
   | { type: 'deleteNode'; node: Node }
-  | { type: 'createNode'; node: Node };
+  | { type: 'createNode'; node: Node }
+  | { type: 'evaluateDownstream'; node: Node }
+  | { type: 'evaluateUpstream'; node: Node };
 
 interface AppState {
   data: Graph;
@@ -180,6 +182,18 @@ function updateApp(event: Event) {
       appState.selected = event.node;
       break;
 
+    case 'evaluateDownstream':
+      // @TODO:
+      // reach `n` levels down the tree and re-evaluate those leaves' values,
+      // where `n` increases with every click
+      break;
+
+    case 'evaluateUpstream':
+      // @TODO:
+      // reach `m` levels up the tree and re-evaluate those leaves' values, down to this one,
+      // where `m` increases with every click
+      break;
+
     case 'init':
     default:
       break;
@@ -222,6 +236,11 @@ function drawNodeForm(selected: AppState['selected']) {
   });
 
   nodeForm.select('button.nodeDeselect').on('click', () => updateApp({ type: 'selectNode', node: undefined }));
+
+  nodeForm
+    .select('button.evaluateDownstream')
+    .on('click', () => updateApp({ type: 'evaluateDownstream', node: selected }));
+  nodeForm.select('button.evaluateUpstream').on('click', () => updateApp({ type: 'evaluateUpstream', node: selected }));
 }
 
 select('#nodeCreate').on('click', () =>
