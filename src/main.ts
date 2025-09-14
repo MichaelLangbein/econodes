@@ -1,5 +1,6 @@
 import { select, type Selection } from 'd3-selection';
 import { scaleLinear } from 'd3-scale';
+import { drag } from 'd3-drag';
 
 /**********************************************
  * DATA
@@ -37,9 +38,9 @@ interface Graph {
 
 const data: Graph = {
   nodes: [
-    { id: 1, x: 0.5, y: 0.25, label: 'A', valueExpression: '', value: 1 },
-    { id: 2, x: 0.25, y: 0.75, label: 'B', valueExpression: '', value: 2 },
-    { id: 3, x: 0.75, y: 0.75, label: 'C', valueExpression: '', value: 3 },
+    { id: 1, x: 0.5, y: 0.25, label: 'A', valueExpression: '1', value: 1 },
+    { id: 2, x: 0.25, y: 0.75, label: 'B', valueExpression: '"A" + 1', value: 2 },
+    { id: 3, x: 0.75, y: 0.75, label: 'C', valueExpression: '"B" + 1', value: 3 },
   ],
   edges: [
     { source: 1, target: 2 },
@@ -59,6 +60,9 @@ function updateNode(updatedNode: Node, graph: Graph) {
 
   // if value change, check that references exist and update edges
   updateEdges(graph);
+
+  // re-evaluate value
+  originalNode.value = evaluateValueString(updatedNode.valueExpression, graph);
 }
 
 function updateEdges(graph: Graph) {
@@ -91,14 +95,14 @@ function extractLabels(valueString: string): string[] {
 }
 
 function substitute(valueString: string, matches: { [key: string]: number }) {
-  const parts = valueString.split('"');
+  const parts = valueString.split('"').filter((p) => p !== '');
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
     if (part in matches) {
       parts[i] = matches[part] + '';
     }
   }
-  const substituted = parts.join();
+  const substituted = parts.join('');
   return substituted;
 }
 
@@ -121,6 +125,7 @@ function evaluateValueString(valueString: string, graph: Graph): number {
 type Event =
   | { type: 'init' }
   | { type: 'selectNode'; node?: Node }
+  | { type: 'moveNode'; node: Node }
   | { type: 'updateNode'; node: Node }
   | { type: 'deleteNode'; node: Node }
   | { type: 'createNode'; node: Node };
@@ -150,12 +155,16 @@ function updateApp(event: Event) {
       break;
 
     case 'updateNode':
+      updateNode(event.node, appState.data);
+      appState.selected = undefined;
+      break;
+
+    case 'moveNode':
       for (let i = 0; i < appState.data.nodes.length; i++) {
         if (appState.data.nodes[i].id === event.node.id) {
           appState.data.nodes[i] = event.node;
         }
       }
-      appState.selected = undefined;
       break;
 
     case 'deleteNode':
@@ -166,6 +175,7 @@ function updateApp(event: Event) {
       break;
 
     case 'createNode':
+      event.node.value = evaluateValueString(event.node.valueExpression, appState.data);
       appState.data.nodes.push(event.node);
       appState.selected = event.node;
       break;
@@ -192,20 +202,25 @@ function drawNodeForm(selected: AppState['selected']) {
     nodeForm.style('opacity', '0');
     return;
   }
+
   const nodeForm = select('#nodeForm');
   nodeForm.style('opacity', '1');
   nodeForm.select('input[name="label"]').property('value', selected.label);
-  nodeForm.select('input[name="value"]').property('value', selected.value);
+  nodeForm.select('input[name="valueExpression"]').property('value', selected.valueExpression);
+  nodeForm.select('span#valueSpan').property('innerHTML', selected.value);
+
   nodeForm.select('button.nodeUpdate').on('click', () => {
     const newNode = { ...selected };
     const nodeForm = select('#nodeForm');
     newNode.label = nodeForm.select('input[name="label"]').property('value');
-    newNode.value = nodeForm.select('input[name="value"]').property('value');
+    newNode.valueExpression = nodeForm.select('input[name="valueExpression"]').property('value');
     updateApp({ type: 'updateNode', node: newNode });
   });
+
   nodeForm.select('button.nodeDelete').on('click', () => {
     updateApp({ type: 'deleteNode', node: selected });
   });
+
   nodeForm.select('button.nodeDeselect').on('click', () => updateApp({ type: 'selectNode', node: undefined }));
 }
 
@@ -256,6 +271,30 @@ defs
  * Drawing functions
  **********************************************/
 
+class Breaker<T> {
+  private queue?: T;
+  private scheduled?: number;
+
+  constructor(private timeout: number, private callback: (d: T) => undefined) {}
+
+  enqueue(datum: T) {
+    this.queue = datum;
+    if (!this.scheduled) {
+      this.scheduled = setTimeout(() => {
+        this.callback(this.queue!);
+        this.scheduled = undefined;
+        this.queue = undefined;
+      }, this.timeout);
+    }
+  }
+}
+
+const dragBreaker = new Breaker<{ evt: DragEvent; node: Node }>(100, ({ evt, node }) => {
+  node.x = xScale.invert(evt.x);
+  node.y = yScale.invert(evt.y);
+  updateApp({ type: 'moveNode', node });
+});
+
 function getNodeById(graph: Graph, id: number) {
   return graph.nodes.find((n) => n.id === id)!;
 }
@@ -280,7 +319,11 @@ function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer:
 function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTMLElement, any>) {
   const connections = rootSvg
     .selectAll<SVGLineElement, Edge>('.connection')
-    .data(graph.edges, (e) => `${e.source}->${e.target}`);
+    .data(graph.edges, (e) => `${e.source}->${e.target}`)
+    .attr('x1', (edge) => xScale(getNodeById(graph, edge.source).x))
+    .attr('y1', (edge) => yScale(getNodeById(graph, edge.source).y))
+    .attr('x2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).x)
+    .attr('y2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).y);
   connections
     .enter()
     .append('line')
@@ -296,7 +339,9 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
   const nodes = rootSvg
     .selectAll<SVGCircleElement, Node>('.node')
     .data(graph.nodes, (d: Node) => d.id)
-    .attr('stroke', (d) => (isSelected(d) ? 'black' : 'none'));
+    .attr('stroke', (d) => (isSelected(d) ? 'black' : 'none'))
+    .attr('cx', (d) => xScale(d.x))
+    .attr('cy', (d) => yScale(d.y));
   nodes
     .enter()
     .append('circle')
@@ -307,13 +352,15 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .attr('cx', (d) => xScale(d.x))
     .attr('cy', (d) => yScale(d.y))
     .on('click', (_, node) => updateApp({ type: 'selectNode', node }))
-    .on('drag', (evt, _) => console.log(evt));
+    .call(drag<SVGCircleElement, Node>().on('drag', (evt, node) => dragBreaker.enqueue({ evt, node })));
   nodes.exit().remove();
 
   const nodeLabels = rootSvg
     .selectAll<SVGTextElement, Node>('.nodeLabel')
     .data(graph.nodes, (d) => d.id)
-    .text((el) => el.label);
+    .text((el) => el.label)
+    .attr('x', (d) => xScale(d.x))
+    .attr('y', (d) => yScale(d.y));
   nodeLabels
     .enter()
     .append('text')
