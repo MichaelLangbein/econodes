@@ -5,12 +5,24 @@ import { scaleLinear } from 'd3-scale';
  * DATA
  **********************************************/
 
+/**
+ * We deliberately keep value and valueExpression side by side
+ * - even though one _should_ be derived from the other.
+ * Because we want to slowly iterate through the graph,
+ * re-evaluating valueExpression on every step, to _visually_ update value.
+ * It is by design that these two may be inconsistent for a while.
+ *
+ * Edges, too, can be derived from value-expressions. Still we maintain them explicitly.
+ * Here, however, this is more for performance reasons.
+ */
+
 interface Node {
   id: number;
   x: number; // between 0 and 1
   y: number; // between 0 and 1
   label: string;
-  value: string;
+  valueExpression: string;
+  value: number;
 }
 
 interface Edge {
@@ -25,9 +37,9 @@ interface Graph {
 
 const data: Graph = {
   nodes: [
-    { id: 1, x: 0.5, y: 0.25, label: 'A', value: '1' },
-    { id: 2, x: 0.25, y: 0.75, label: 'B', value: '2' },
-    { id: 3, x: 0.75, y: 0.75, label: 'C', value: '3' },
+    { id: 1, x: 0.5, y: 0.25, label: 'A', valueExpression: '', value: 1 },
+    { id: 2, x: 0.25, y: 0.75, label: 'B', valueExpression: '', value: 2 },
+    { id: 3, x: 0.75, y: 0.75, label: 'C', valueExpression: '', value: 3 },
   ],
   edges: [
     { source: 1, target: 2 },
@@ -40,13 +52,24 @@ function updateNode(updatedNode: Node, graph: Graph) {
 
   // if label change, update all nodes value-expressions to match
   for (const node of graph.nodes) {
-    if (node.value.includes(originalNode.label)) {
-      node.value.replace(originalNode.label, updatedNode.label);
+    if (node.valueExpression.includes(originalNode.label)) {
+      node.valueExpression.replace(originalNode.label, updatedNode.label);
     }
   }
 
   // if value change, check that references exist and update edges
   updateEdges(graph);
+}
+
+function updateEdges(graph: Graph) {
+  graph.edges = [];
+  for (const targetNode of graph.nodes) {
+    const labels = extractLabels(targetNode.valueExpression);
+    for (const label of labels) {
+      const sourceNode = graph.nodes.find((n) => n.label === label);
+      if (sourceNode) graph.edges.push({ source: sourceNode.id, target: targetNode.id });
+    }
+  }
 }
 
 function extractLabels(valueString: string): string[] {
@@ -79,22 +102,11 @@ function substitute(valueString: string, matches: { [key: string]: number }) {
   return substituted;
 }
 
-function updateEdges(graph: Graph) {
-  graph.edges = [];
-  for (const targetNode of graph.nodes) {
-    const labels = extractLabels(targetNode.value);
-    for (const label of labels) {
-      const sourceNode = graph.nodes.find((n) => n.label === label);
-      if (sourceNode) graph.edges.push({ source: sourceNode.id, target: targetNode.id });
-    }
-  }
-}
-
 function evaluateValueString(valueString: string, graph: Graph): number {
   const labels = extractLabels(valueString);
   const matchedValues: { [key: string]: number } = {};
   for (const label of labels) {
-    const valueString = graph.nodes.find((n) => n.label === label)!.value;
+    const valueString = graph.nodes.find((n) => n.label === label)!.valueExpression;
     matchedValues[label] = evaluateValueString(valueString, graph);
   }
   const subsitutedString = substitute(valueString, matchedValues);
@@ -203,7 +215,8 @@ select('#nodeCreate').on('click', () =>
     node: {
       id: Math.max(...appState.data.nodes.map((n) => n.id)) + 1,
       label: 'New node',
-      value: '1',
+      value: 1,
+      valueExpression: '1',
       x: 0.5,
       y: 0.5,
     },
