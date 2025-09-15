@@ -65,7 +65,7 @@ function updateNode(updatedNode: Node, graph: Graph) {
   updateEdges(graph);
 
   // re-evaluate value
-  originalNode.value = evaluateValueString(updatedNode.valueExpression, graph);
+  originalNode.value = evaluateValueString(updatedNode.valueExpression, graph, false);
 }
 
 function updateEdges(graph: Graph) {
@@ -109,12 +109,17 @@ function substitute(valueString: string, matches: { [key: string]: number }) {
   return substituted;
 }
 
-function evaluateValueString(valueString: string, graph: Graph): number {
+function evaluateValueString(valueString: string, graph: Graph, recursive = true): number {
   const labels = extractLabels(valueString);
   const matchedValues: { [key: string]: number } = {};
   for (const label of labels) {
-    const valueString = graph.nodes.find((n) => n.label === label)!.valueExpression;
-    matchedValues[label] = evaluateValueString(valueString, graph);
+    const node = graph.nodes.find((n) => n.label === label)!
+    if (recursive) {
+      const valueString = node.valueExpression;
+      matchedValues[label] = evaluateValueString(valueString, graph, recursive);
+    } else {
+      matchedValues[label] = node.value;
+    }
   }
   const subsitutedString = substitute(valueString, matchedValues);
   const evaluated: number = eval(subsitutedString);
@@ -236,7 +241,7 @@ function updateApp(event: Event) {
       break;
 
     case 'createNode':
-      event.node.value = evaluateValueString(event.node.valueExpression, appState.data);
+      event.node.value = evaluateValueString(event.node.valueExpression, appState.data, false);
       appState.data.nodes.push(event.node);
       appState.selected = event.node;
       break;
@@ -251,7 +256,11 @@ function updateApp(event: Event) {
         childNodes = [event.node];
       }
       for (const childNode of childNodes) {
+        const originalValue = childNode.value;
         updateNode(childNode, appState.data);
+        const newValue = childNode.value;
+        const changeLine = `${childNode.label}: ${originalValue} -> ${newValue}`;
+        console.log(changeLine);
       }
       break;
 
