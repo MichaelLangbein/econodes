@@ -260,7 +260,7 @@ function updateApp(event: Event) {
         updateNode(childNode, appState.data);
         const newValue = childNode.value;
         const changeLine = `${childNode.label}: ${originalValue} -> ${newValue}`;
-        console.log(changeLine);
+        select('#logContainer').append('span').property('innerHTML', changeLine);
       }
       break;
 
@@ -341,17 +341,14 @@ select('#exportGraph').on('click', () => updateApp({type: 'exportGraph'}));
  * SVG Setup
  **********************************************/
 
-const rootElement = select('#app');
+// const rootElement = select('#app');
 
 const viewBoxX = 500;
 const viewBoxY = 500;
 const xScale = scaleLinear([0, 1], [0, viewBoxX]);
 const yScale = scaleLinear([0, 1], [0, viewBoxY]);
 
-const rootSvg = rootElement
-  .append('svg')
-  .attr('width', '600px')
-  .attr('height', '500px')
+const rootSvg = select('#svg')
   .attr('viewBox', `0 0 ${viewBoxX} ${viewBoxY}`);
 const defs = rootSvg.append('defs');
 defs
