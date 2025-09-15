@@ -3,7 +3,7 @@ import { scaleLinear } from 'd3-scale';
 import { drag } from 'd3-drag';
 
 /**********************************************
- * DATA
+ * Model data and helpers
  **********************************************/
 
 /**
@@ -51,7 +51,7 @@ const data: Graph = {
 function updateNode(updatedNode: Node, graph: Graph) {
   let originalNode = graph.nodes.find((n) => n.id === updatedNode.id)!;
 
-  // primitive values
+  // copy over primitive values
   originalNode = Object.assign(originalNode, updatedNode);
 
   // if label change, update all nodes value-expressions to match
@@ -121,6 +121,60 @@ function evaluateValueString(valueString: string, graph: Graph): number {
   return evaluated;
 }
 
+function getNodeById(graph: Graph, id: number) {
+  return graph.nodes.find((n) => n.id === id)!;
+}
+
+function getChildren(node: Node, graph: Graph) {
+  const children = graph.edges
+      .filter(e => e.source === node.id)
+      .map(e => e.target)
+      .map(targetId => getNodeById(graph, targetId));
+  return children;
+}
+
+function unique<T, I>(lst: T[], idFunc: (t: T) => I) {
+  const seen = new Set<I>();
+  const result: T[] = [];
+  for (const item of lst) {
+    const id = idFunc(item);
+    if (!seen.has(id)) {
+      seen.add(id);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
+function getNthGenChildren(node: Node, depth: number, graph: Graph): Node[] {
+  if (depth === 0) return [node];
+  if (depth === 1) return getChildren(node, graph);
+
+  const descendants: Node[] = [];
+  const directChildren = getChildren(node, graph);
+  for (const child of directChildren) {
+    descendants.push(...getNthGenChildren(child, depth - 1, graph));
+  }
+
+  return unique(descendants, (d => d.id));
+}
+
+function downloadJson(graph: Graph) {
+  const dataStr = JSON.stringify(graph, null, 2);
+  const blob = new Blob([dataStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "graph.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  URL.revokeObjectURL(url);
+}
+
+
 /**********************************************
  * State Management
  **********************************************/
@@ -133,11 +187,12 @@ type Event =
   | { type: 'deleteNode'; node: Node }
   | { type: 'createNode'; node: Node }
   | { type: 'evaluateDownstream'; node: Node }
-  | { type: 'evaluateUpstream'; node: Node };
+  | { type: "exportGraph"; };
 
 interface AppState {
   data: Graph;
   selected: Node | undefined;
+  evalDepth: number | undefined;
 }
 
 function isSelected(node: Node) {
@@ -148,6 +203,7 @@ function isSelected(node: Node) {
 const appState: AppState = {
   data,
   selected: undefined,
+  evalDepth: undefined
 };
 
 function updateApp(event: Event) {
@@ -157,11 +213,11 @@ function updateApp(event: Event) {
   switch (event.type) {
     case 'selectNode':
       appState.selected = event.node;
+      appState.evalDepth = undefined;
       break;
 
     case 'updateNode':
       updateNode(event.node, appState.data);
-      appState.selected = undefined;
       break;
 
     case 'moveNode':
@@ -186,16 +242,22 @@ function updateApp(event: Event) {
       break;
 
     case 'evaluateDownstream':
-      // @TODO:
-      // reach `n` levels down the tree and re-evaluate those leaves' values,
-      // where `n` increases with every click
+      if (appState.evalDepth === undefined) appState.evalDepth = 0;
+      appState.evalDepth += 1;
+      let childNodes = getNthGenChildren(event.node, appState.evalDepth, appState.data);
+      if (childNodes.length === 0) {
+        // start again at 0
+        appState.evalDepth = 0; 
+        childNodes = [event.node];
+      }
+      for (const childNode of childNodes) {
+        updateNode(childNode, appState.data);
+      }
       break;
 
-    case 'evaluateUpstream':
-      // @TODO:
-      // reach `m` levels up the tree and re-evaluate those leaves' values, down to this one,
-      // where `m` increases with every click
-      break;
+      case 'exportGraph':
+        downloadJson(appState.data);
+        break;
 
     case 'init':
     default:
@@ -246,6 +308,7 @@ function drawNodeForm(selected: AppState['selected']) {
   nodeForm.select('button.evaluateUpstream').on('click', () => updateApp({ type: 'evaluateUpstream', node: selected }));
 }
 
+
 select('#nodeCreate').on('click', () =>
   updateApp({
     type: 'createNode',
@@ -259,6 +322,11 @@ select('#nodeCreate').on('click', () =>
     },
   })
 );
+
+
+select('#exportGraph').on('click', () => updateApp({type: 'exportGraph'}));
+
+
 
 /**********************************************
  * SVG Setup
@@ -315,9 +383,6 @@ const dragBreaker = new Breaker<{ evt: DragEvent; node: Node }>(50, ({ evt, node
   updateApp({ type: 'moveNode', node });
 });
 
-function getNodeById(graph: Graph, id: number) {
-  return graph.nodes.find((n) => n.id === id)!;
-}
 
 function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer: number) {
   const startNode = getNodeById(graph, startId);
@@ -337,6 +402,9 @@ function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer:
 }
 
 function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTMLElement, any>) {
+  const maxVal = Math.max(...graph.nodes.map(n => n.value));
+  const radiusScale = scaleLinear([0, maxVal], [0, 50]);
+
   const connections = rootSvg
     .selectAll<SVGLineElement, Edge>('.connection')
     .data(graph.edges, (e) => `${e.source}->${e.target}`)
@@ -361,12 +429,13 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .data(graph.nodes, (d: Node) => d.id)
     .attr('stroke', (d) => (isSelected(d) ? 'black' : 'none'))
     .attr('cx', (d) => xScale(d.x))
-    .attr('cy', (d) => yScale(d.y));
+    .attr('cy', (d) => yScale(d.y))
+    .attr('r', d => radiusScale(d.value) + 'px');
   nodes
     .enter()
     .append('circle')
     .attr('class', 'node')
-    .attr('r', '10px')
+    .attr('r', d => radiusScale(d.value) + 'px')
     .attr('fill', 'grey')
     .attr('stroke', (d) => (isSelected(d) ? 'black' : 'none'))
     .attr('cx', (d) => xScale(d.x))
@@ -382,14 +451,14 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
   const nodeLabels = rootSvg
     .selectAll<SVGTextElement, Node>('.nodeLabel')
     .data(graph.nodes, (d) => d.id)
-    .text((el) => el.label)
+    .text((el) => el.label + ": " + el.value)
     .attr('x', (d) => xScale(d.x))
     .attr('y', (d) => yScale(d.y));
   nodeLabels
     .enter()
     .append('text')
     .attr('class', 'nodeLabel')
-    .text((el) => el.label)
+    .text((el) => el.label + ": " + el.value)
     .attr('x', (d) => xScale(d.x))
     .attr('y', (d) => yScale(d.y))
     .on('click', (_, node) => updateApp({ type: 'selectNode', node }));
