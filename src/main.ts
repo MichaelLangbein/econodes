@@ -49,7 +49,10 @@ const data: Graph = {
 };
 
 function updateNode(updatedNode: Node, graph: Graph) {
-  const originalNode = graph.nodes.find((n) => n.id === updatedNode.id)!;
+  let originalNode = graph.nodes.find((n) => n.id === updatedNode.id)!;
+
+  // primitive values
+  originalNode = Object.assign(originalNode, updatedNode);
 
   // if label change, update all nodes value-expressions to match
   for (const node of graph.nodes) {
@@ -308,9 +311,7 @@ class Breaker<T> {
   }
 }
 
-const dragBreaker = new Breaker<{ evt: DragEvent; node: Node }>(100, ({ evt, node }) => {
-  node.x = xScale.invert(evt.x);
-  node.y = yScale.invert(evt.y);
+const dragBreaker = new Breaker<{ evt: DragEvent; node: Node }>(50, ({ evt, node }) => {
   updateApp({ type: 'moveNode', node });
 });
 
@@ -371,7 +372,11 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .attr('cx', (d) => xScale(d.x))
     .attr('cy', (d) => yScale(d.y))
     .on('click', (_, node) => updateApp({ type: 'selectNode', node }))
-    .call(drag<SVGCircleElement, Node>().on('drag', (evt, node) => dragBreaker.enqueue({ evt, node })));
+    .call(drag<SVGCircleElement, Node>().on('drag', (evt, node) => {
+        node.x += xScale.invert(evt.dx);
+        node.y += yScale.invert(evt.dy);
+        dragBreaker.enqueue({ evt, node });
+    }));
   nodes.exit().remove();
 
   const nodeLabels = rootSvg
