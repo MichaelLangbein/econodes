@@ -416,8 +416,8 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .data(graph.edges, (e) => `${e.source}->${e.target}`)
     .attr('x1', (edge) => xScale(getNodeById(graph, edge.source).x))
     .attr('y1', (edge) => yScale(getNodeById(graph, edge.source).y))
-    .attr('x2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).x)
-    .attr('y2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).y);
+    .attr('x2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, radiusScale(getNodeById(graph, edge.target).value)).x)
+    .attr('y2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, radiusScale(getNodeById(graph, edge.target).value)).y);
   connections
     .enter()
     .append('line')
