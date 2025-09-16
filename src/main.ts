@@ -322,7 +322,7 @@ select('#nodeCreate').on('click', () =>
   updateApp({
     type: 'createNode',
     node: {
-      id: Math.max(...appState.data.nodes.map((n) => n.id)) + 1,
+      id: appState.data.nodes.length > 0 ? Math.max(...appState.data.nodes.map((n) => n.id)) + 1 : 1,
       label: 'New node',
       value: 1,
       valueExpression: '1',
@@ -344,11 +344,11 @@ select('#exportGraph').on('click', () => updateApp({type: 'exportGraph'}));
 // const rootElement = select('#app');
 
 const viewBoxX = 500;
-const viewBoxY = 500;
+const viewBoxY = 350;
 const xScale = scaleLinear([0, 1], [0, viewBoxX]);
 const yScale = scaleLinear([0, 1], [0, viewBoxY]);
 
-const rootSvg = select('#svg')
+const rootSvg = select<SVGSVGElement, unknown>('#svg')
   .attr('viewBox', `0 0 ${viewBoxX} ${viewBoxY}`);
 const defs = rootSvg.append('defs');
 defs
@@ -409,7 +409,7 @@ function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer:
 
 function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTMLElement, any>) {
   const maxVal = Math.max(...graph.nodes.map(n => n.value));
-  const radiusScale = scaleLinear([0, maxVal], [0, 50]);
+  const radiusScale = scaleLinear([0, maxVal], [5, 50]);
 
   const connections = rootSvg
     .selectAll<SVGLineElement, Edge>('.connection')
