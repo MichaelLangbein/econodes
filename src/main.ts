@@ -409,7 +409,7 @@ function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer:
 
 function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTMLElement, any>) {
   const maxVal = Math.max(...graph.nodes.map(n => n.value));
-  const radiusScale = scaleLinear([0, maxVal], [5, 50]);
+  const radiusScale = scaleLinear([0, maxVal], [5, 50]).clamp(true);
 
   const connections = rootSvg
     .selectAll<SVGLineElement, Edge>('.connection')
