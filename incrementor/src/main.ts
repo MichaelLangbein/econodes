@@ -1,6 +1,7 @@
 import { select, type Selection } from 'd3-selection';
 import { scaleLinear } from 'd3-scale';
 import { drag } from 'd3-drag';
+import { zoom } from 'd3-zoom';
 
 function unique<T>(lst: T[]): T[] {
   return Array.from(new Set(lst));
@@ -220,7 +221,7 @@ function updateApp(event: Event) {
   }
 
   // step 2: given state, update app
-  drawGraph(appState.data, rootSvg);
+  drawGraph(appState.data, rootGroup);
   drawNodeForm(appState.selected);
   drawEdgeForm(appState.selected);
 
@@ -405,6 +406,7 @@ const yScale = scaleLinear([0, 1], [0, viewBoxY]);
 
 const rootSvg = select<SVGSVGElement, unknown>('#svg')
   .attr('viewBox', `0 0 ${viewBoxX} ${viewBoxY}`);
+const rootGroup = rootSvg.append('g');
 const defs = rootSvg.append('defs');
 defs
   .append('marker')
@@ -417,6 +419,9 @@ defs
   .attr('orient', 'auto-start-reverse')
   .append('path')
   .attr('d', 'M 0 0 L 10 5 L 0 10 z');
+
+const zoomBehavior = zoom<SVGSVGElement, unknown>();
+rootSvg.call(zoomBehavior.on('zoom', (evt) => rootGroup.attr('transform', evt.transform)));
 
 /**********************************************
  * Drawing functions
@@ -476,12 +481,12 @@ function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer:
   return { x: fractionX, y: fractionY };
 }
 
-function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTMLElement, any>) {
+function drawGraph(graph: Graph, root: Selection<SVGGElement, unknown, HTMLElement, any>) {
   const maxVal = Math.max(...graph.nodes.map(n => n.value));
   const radiusScale = scaleLinear([0, maxVal], [5, 50]).clamp(true);
 
 
-  const connections = rootSvg
+  const connections = root
     .selectAll<SVGLineElement, Edge>('.connection')
     .data(graph.edges, (e) => `${e.source}->${e.target}`)
     .attr('x1', (edge) => xScale(getNodeById(graph, edge.source).x))
@@ -502,7 +507,7 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
   connections.exit().remove();
 
 
-  const connectionLabelGroups = rootSvg.selectAll<SVGGElement, Edge>('.connectionLabel')
+  const connectionLabelGroups = root.selectAll<SVGGElement, Edge>('.connectionLabel')
     .data(graph.edges, (e) => `${e.source}-${e.target}`)
     .attr('transform', edge => `translate(${wayFraction(graph, edge.source, edge.target, 0.5).x}, ${wayFraction(graph, edge.source, edge.target, 0.5).y})`);
   connectionLabelGroups.select('text').text(e => e.type === 'increment' ? '+' : '-').attr('transform', 'translate(-4.5, 5)');
@@ -519,7 +524,7 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
   connectionLabelGroups.exit().remove();
 
 
-  const nodes = rootSvg
+  const nodes = root
     .selectAll<SVGCircleElement, Node>('.node')
     .data(graph.nodes, (d: Node) => d.id)
     .attr('stroke', (d) => (isSelected(d) ? 'black' : appState.impulses.includes(d.id) ? 'blue' : 'none'))
@@ -544,7 +549,7 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
   nodes.exit().remove();
 
 
-  const nodeLabels = rootSvg
+  const nodeLabels = root
     .selectAll<SVGTextElement, Node>('.nodeLabel')
     .data(graph.nodes, (d) => d.id)
     .text((el) => el.label + ": " + el.value)
