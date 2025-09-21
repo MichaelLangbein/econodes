@@ -366,7 +366,7 @@ select('#edgeCreate').on('click', () => {
       }
     }
   }
-  if (!node1 || !node1) {
+  if (!node1 || !node2) {
     console.log('Fully connected graph. You can\'t create a new edge.');
     return;
   }
