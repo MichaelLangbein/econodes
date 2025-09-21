@@ -142,12 +142,14 @@ function updateApp(event: Event) {
       const targetNode = appState.data.nodes.find(n => n.id === event.node.id)!;
       targetNode.value += 1;
       appState.impulses.push(targetNode.id);
+      select('#logContainer').append('p').property('innerHTML', `'${targetNode.label}' manually incremented to ${targetNode.value}`);
       break;
 
     case 'decrementNode':
       const targetNode1 = appState.data.nodes.find(n => n.id === event.node.id)!;
       targetNode1.value -= 1;
       appState.impulses.push(targetNode1.id);
+      select('#logContainer').append('p').property('innerHTML', `'${targetNode1.label}' manually decremented to ${targetNode1.value}`);
       break;
 
     case 'moveNode':
@@ -177,6 +179,7 @@ function updateApp(event: Event) {
           if (connection.type === "increment") targetNode.value += 1;
           if (connection.type === "decrement") targetNode.value -= 1;
           newImpulses.push(targetNode.id);
+          select('#logContainer').append('p').property('innerHTML', `'${targetNode.label}' ${connection.type}ed to ${targetNode.value}`);
         }
       }
       appState.impulses = unique(newImpulses);
@@ -186,14 +189,8 @@ function updateApp(event: Event) {
       appState.impulses = [];
       break;
 
-      case 'createEdge':
-        appState.selected = event.edge;
-      //   for (const edge of appState.data.edges) {
-      //     if (edge.source === event.edge.source && edge.target === event.edge.target) {
-      //       console.log("Edge already exists", edge);
-      //       return;
-      //   }
-      // }
+    case 'createEdge':
+      appState.selected = event.edge;
       appState.data.edges.push(event.edge);
       break;
 
@@ -329,6 +326,10 @@ function drawEdgeForm(selected: AppState['selected']) {
       const newType = (this as HTMLSelectElement).value as Edge['type'];
       updateApp({type: 'updateEdge',edge: { ...selected, type: newType }});
     });
+
+  edgeForm.select('.edgeDelete').on('click', () => updateApp({type: 'deleteEdge', edge: selected}));
+
+  edgeForm.select('.edgeDeselect').on('click', () => updateApp({type: 'selectEdge'}));
 }
 
 
@@ -347,9 +348,29 @@ select('#nodeCreate').on('click', () =>
 
 
 select('#edgeCreate').on('click', () => {
-  if (appState.data.nodes.length <= 1) return;
-  const node1 = appState.data.nodes[0];
-  const node2 = appState.data.nodes[1];
+  if (appState.data.nodes.length <= 1) {
+    console.warn('create at least two nodes before trying to create a connection.');
+    return;
+  }
+
+  let node1: Node | undefined = undefined;
+  let node2: Node | undefined = undefined;
+  for (const candidateNode1 of appState.data.nodes) {
+    for (const candidateNode2 of appState.data.nodes) {
+      if (candidateNode1.id === candidateNode2.id) continue;
+      const connection = appState.data.edges.find(e => e.source === candidateNode1.id && e.target === candidateNode2.id);
+      if (!connection) {
+        node1 = candidateNode1; 
+        node2 = candidateNode2;
+        break;
+      }
+    }
+  }
+  if (!node1 || !node1) {
+    console.log('Fully connected graph. You can\'t create a new edge.');
+    return;
+  }
+
     updateApp({
       type: 'createEdge',
       edge: {
@@ -424,6 +445,20 @@ const dragBreaker = new Breaker<{ evt: DragEvent; node: Node }>(50, ({ evt, node
 });
 
 
+function wayFraction(graph: Graph, startId: number, targetId: number, fraction: number) {
+  const startNode = getNodeById(graph, startId);
+  const targetNode = getNodeById(graph, targetId);
+  const startX = xScale(startNode.x);
+  const startY = yScale(startNode.y);
+  const targetX = xScale(targetNode.x);
+  const targetY = yScale(targetNode.y);
+  const deltaX = targetX - startX;
+  const deltaY = targetY - startY;
+  const fracX = startX + fraction * deltaX;
+  const fracY = startY + fraction * deltaY;
+  return {x: fracX, y: fracY};
+}
+
 function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer: number) {
   const startNode = getNodeById(graph, startId);
   const targetNode = getNodeById(graph, targetId);
@@ -445,6 +480,7 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
   const maxVal = Math.max(...graph.nodes.map(n => n.value));
   const radiusScale = scaleLinear([0, maxVal], [5, 50]).clamp(true);
 
+
   const connections = rootSvg
     .selectAll<SVGLineElement, Edge>('.connection')
     .data(graph.edges, (e) => `${e.source}->${e.target}`)
@@ -461,8 +497,23 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .attr('x2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).x)
     .attr('y2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).y)
     .attr('stroke', 'black')
-    .attr('marker-end', 'url(#arrow)');
+    .attr('marker-end', 'url(#arrow)')
+    .on('click', (_, edge) => updateApp({type: 'selectEdge', edge}));
   connections.exit().remove();
+
+
+  const connectionLabelGroups = rootSvg.selectAll<SVGGElement, Edge>('.connectionLabel')
+    .data(graph.edges, (e) => `${e.source}-${e.target}`)
+    .attr('transform', edge => `translate(${wayFraction(graph, edge.source, edge.target, 0.5).x}, ${wayFraction(graph, edge.source, edge.target, 0.5).y})`);
+  connectionLabelGroups.select('text').text(e => e.type === 'increment' ? '+' : '-').attr('transform', 'translate(-4.5, 5)');
+  const connectionLabelsNew = connectionLabelGroups.enter()
+    .append('g')
+    .attr('class', 'connectionLabel')
+    .attr('transform', edge => `translate(${wayFraction(graph, edge.source, edge.target, 0.5).x}, ${wayFraction(graph, edge.source, edge.target, 0.5).y})`);
+  connectionLabelsNew.append('circle').attr('r', 5).attr('fill', 'lightgrey');
+  connectionLabelsNew.append('text').text(e => e.type === 'increment' ? '+' : '-').attr('transform', 'translate(-4.5, 5)');
+  connectionLabelGroups.exit().remove();
+
 
   const nodes = rootSvg
     .selectAll<SVGCircleElement, Node>('.node')
@@ -487,6 +538,7 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
         dragBreaker.enqueue({ evt, node });
     }));
   nodes.exit().remove();
+
 
   const nodeLabels = rootSvg
     .selectAll<SVGTextElement, Node>('.nodeLabel')
