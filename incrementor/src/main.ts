@@ -141,14 +141,14 @@ function updateApp(event: Event) {
     case 'incrementNode':
       const targetNode = appState.data.nodes.find(n => n.id === event.node.id)!;
       targetNode.value += 1;
-      appState.impulses.push(targetNode.id);
+      appState.impulses = [targetNode.id];
       select('#logContainer').append('p').property('innerHTML', `'${targetNode.label}' manually incremented to ${targetNode.value}`);
       break;
 
     case 'decrementNode':
       const targetNode1 = appState.data.nodes.find(n => n.id === event.node.id)!;
       targetNode1.value -= 1;
-      appState.impulses.push(targetNode1.id);
+      appState.impulses = [targetNode1.id];
       select('#logContainer').append('p').property('innerHTML', `'${targetNode1.label}' manually decremented to ${targetNode1.value}`);
       break;
 
@@ -510,8 +510,12 @@ function drawGraph(graph: Graph, rootSvg: Selection<SVGSVGElement, unknown, HTML
     .append('g')
     .attr('class', 'connectionLabel')
     .attr('transform', edge => `translate(${wayFraction(graph, edge.source, edge.target, 0.5).x}, ${wayFraction(graph, edge.source, edge.target, 0.5).y})`);
-  connectionLabelsNew.append('circle').attr('r', 5).attr('fill', 'lightgrey');
-  connectionLabelsNew.append('text').text(e => e.type === 'increment' ? '+' : '-').attr('transform', 'translate(-4.5, 5)');
+  connectionLabelsNew
+    .append('circle').attr('r', 5).attr('fill', 'lightgrey')
+    .on('click', (_, e) => updateApp({type: 'selectEdge', edge: e}));
+  connectionLabelsNew
+    .append('text').text(e => e.type === 'increment' ? '+' : '-').attr('transform', 'translate(-4.5, 5)')
+    .on('click', (_, e) => updateApp({type: 'selectEdge', edge: e}));
   connectionLabelGroups.exit().remove();
 
 
