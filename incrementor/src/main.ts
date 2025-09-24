@@ -106,10 +106,15 @@ type Event =
   | { type: 'createEdge'; edge: Edge }
   | { type: "exportGraph"; };
 
+interface Impulse {
+  nodeId: number;
+  delta: number;
+}
+
 interface AppState {
   data: Graph;
   selected?: Node | Edge;
-  impulses: number[];
+  impulses: Impulse[];
 }
 
 function isSelected(element: Node | Edge) {
@@ -142,14 +147,14 @@ function updateApp(event: Event) {
     case 'incrementNode':
       const targetNode = appState.data.nodes.find(n => n.id === event.node.id)!;
       targetNode.value += 1;
-      appState.impulses = [targetNode.id];
+      appState.impulses = [{nodeId: targetNode.id, delta: 1}];
       select('#logContainer').append('p').property('innerHTML', `'${targetNode.label}' manually incremented to ${targetNode.value}`);
       break;
 
     case 'decrementNode':
       const targetNode1 = appState.data.nodes.find(n => n.id === event.node.id)!;
       targetNode1.value -= 1;
-      appState.impulses = [targetNode1.id];
+      appState.impulses = [{nodeId: targetNode1.id, delta: -1}];
       select('#logContainer').append('p').property('innerHTML', `'${targetNode1.label}' manually decremented to ${targetNode1.value}`);
       break;
 
@@ -172,18 +177,24 @@ function updateApp(event: Event) {
       break;
 
     case 'pushImpulsesDownstream':
-      const newImpulses: number[] = [];
-      for (const nodeId of appState.impulses) {
-        const downstreamConnections = appState.data.edges.filter(e => e.source === nodeId);
+      const newImpulses: Impulse[] = [];
+      for (const impulse of appState.impulses) {
+        const downstreamConnections = appState.data.edges.filter(e => e.source === impulse.nodeId);
         for (const connection of downstreamConnections) {
           const targetNode = getNodeById(appState.data, connection.target);
-          if (connection.type === "increment") targetNode.value += 1;
-          if (connection.type === "decrement") targetNode.value -= 1;
-          newImpulses.push(targetNode.id);
+          if (connection.type === "increment") {
+            targetNode.value += impulse.delta;
+            newImpulses.push({nodeId: targetNode.id, delta: impulse.delta > 0 ? 1 : -1);
+          }
+          if (connection.type === "decrement") {
+            targetNode.value -= impulse.delta;
+            newImpulses.push({nodeId: targetNode.id, delta: impulse.delta > 0 ? -1 : 1);
+          };
+          
           select('#logContainer').append('p').property('innerHTML', `'${targetNode.label}' ${connection.type}ed to ${targetNode.value}`);
         }
       }
-      appState.impulses = unique(newImpulses);
+      appState.impulses = newImpulses;
       break;
 
     case 'removeImpulses':
@@ -527,7 +538,7 @@ function drawGraph(graph: Graph, root: Selection<SVGGElement, unknown, HTMLEleme
   const nodes = root
     .selectAll<SVGCircleElement, Node>('.node')
     .data(graph.nodes, (d: Node) => d.id)
-    .attr('stroke', (d) => (isSelected(d) ? 'black' : appState.impulses.includes(d.id) ? 'blue' : 'none'))
+    .attr('stroke', (d) => (isSelected(d) ? 'black' : appState.impulses.map(i => i.nodeId).includes(d.id) ? 'blue' : 'none'))
     .attr('cx', (d) => xScale(d.x))
     .attr('cy', (d) => yScale(d.y))
     .attr('r', d => radiusScale(d.value) + 'px');
@@ -537,7 +548,7 @@ function drawGraph(graph: Graph, root: Selection<SVGGElement, unknown, HTMLEleme
     .attr('class', 'node')
     .attr('r', d => radiusScale(d.value) + 'px')
     .attr('fill', 'grey')
-    .attr('stroke', (d) => (isSelected(d) ? 'black' : appState.impulses.includes(d.id) ? 'blue' : 'none'))
+    .attr('stroke', (d) => (isSelected(d) ? 'black' : appState.impulses.map(i => i.nodeId).includes(d.id) ? 'blue' : 'none'))
     .attr('cx', (d) => xScale(d.x))
     .attr('cy', (d) => yScale(d.y))
     .on('click', (_, node) => updateApp({ type: 'selectNode', node }))
