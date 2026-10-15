@@ -23,7 +23,7 @@ interface Edge {
   id: number;
   source: Node['id'];
   target: Node['id'];
-  type: "increment" | "decrement";
+  type: 'increment' | 'decrement';
 }
 
 interface Graph {
@@ -71,19 +71,18 @@ function getNodeById(graph: Graph, id: number) {
 
 function downloadJson(graph: Graph) {
   const dataStr = JSON.stringify(graph, null, 2);
-  const blob = new Blob([dataStr], { type: "application/json" });
+  const blob = new Blob([dataStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
-  a.download = "graph.json";
+  a.download = 'graph.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
 
   URL.revokeObjectURL(url);
 }
-
 
 /**********************************************
  * State Management
@@ -99,12 +98,12 @@ type Event =
   | { type: 'deleteNode'; node: Node }
   | { type: 'createNode'; node: Node }
   | { type: 'pushImpulsesDownstream' }
-  | { type: 'removeImpulses'}
+  | { type: 'removeImpulses' }
   | { type: 'selectEdge'; edge?: Edge }
   | { type: 'updateEdge'; edge: Edge }
   | { type: 'deleteEdge'; edge: Edge }
   | { type: 'createEdge'; edge: Edge }
-  | { type: "exportGraph"; };
+  | { type: 'exportGraph' };
 
 interface Impulse {
   nodeId: number;
@@ -120,14 +119,15 @@ interface AppState {
 function isSelected(element: Node | Edge) {
   if (!appState.selected) return false;
   if (isNode(element) && isNode(appState.selected)) return element.id === appState.selected.id;
-  if (isEdge(element) && isEdge(appState.selected)) return element.source === appState.selected.source && element.target === appState.selected.target;
+  if (isEdge(element) && isEdge(appState.selected))
+    return element.source === appState.selected.source && element.target === appState.selected.target;
   return false;
 }
 
 const appState: AppState = {
   data,
   selected: undefined,
-  impulses: []
+  impulses: [],
 };
 
 function updateApp(event: Event) {
@@ -145,17 +145,21 @@ function updateApp(event: Event) {
       break;
 
     case 'incrementNode':
-      const targetNode = appState.data.nodes.find(n => n.id === event.node.id)!;
+      const targetNode = appState.data.nodes.find((n) => n.id === event.node.id)!;
       targetNode.value += 1;
-      appState.impulses = [{nodeId: targetNode.id, delta: 1}];
-      select('#logContainer').append('p').property('innerHTML', `'${targetNode.label}' manually incremented to ${targetNode.value}`);
+      appState.impulses = [{ nodeId: targetNode.id, delta: 1 }];
+      select('#logContainer')
+        .append('p')
+        .property('innerHTML', `'${targetNode.label}' manually incremented to ${targetNode.value}`);
       break;
 
     case 'decrementNode':
-      const targetNode1 = appState.data.nodes.find(n => n.id === event.node.id)!;
+      const targetNode1 = appState.data.nodes.find((n) => n.id === event.node.id)!;
       targetNode1.value -= 1;
-      appState.impulses = [{nodeId: targetNode1.id, delta: -1}];
-      select('#logContainer').append('p').property('innerHTML', `'${targetNode1.label}' manually decremented to ${targetNode1.value}`);
+      appState.impulses = [{ nodeId: targetNode1.id, delta: -1 }];
+      select('#logContainer')
+        .append('p')
+        .property('innerHTML', `'${targetNode1.label}' manually decremented to ${targetNode1.value}`);
       break;
 
     case 'moveNode':
@@ -179,19 +183,21 @@ function updateApp(event: Event) {
     case 'pushImpulsesDownstream':
       const newImpulses: Impulse[] = [];
       for (const impulse of appState.impulses) {
-        const downstreamConnections = appState.data.edges.filter(e => e.source === impulse.nodeId);
+        const downstreamConnections = appState.data.edges.filter((e) => e.source === impulse.nodeId);
         for (const connection of downstreamConnections) {
           const targetNode = getNodeById(appState.data, connection.target);
-          if (connection.type === "increment") {
+          if (connection.type === 'increment') {
             targetNode.value += impulse.delta;
-            newImpulses.push({nodeId: targetNode.id, delta: impulse.delta > 0 ? 1 : -1);
+            newImpulses.push({ nodeId: targetNode.id, delta: impulse.delta > 0 ? 1 : -1 });
           }
-          if (connection.type === "decrement") {
+          if (connection.type === 'decrement') {
             targetNode.value -= impulse.delta;
-            newImpulses.push({nodeId: targetNode.id, delta: impulse.delta > 0 ? -1 : 1);
-          };
-          
-          select('#logContainer').append('p').property('innerHTML', `'${targetNode.label}' ${connection.type}ed to ${targetNode.value}`);
+            newImpulses.push({ nodeId: targetNode.id, delta: impulse.delta > 0 ? -1 : 1 });
+          }
+
+          select('#logContainer')
+            .append('p')
+            .property('innerHTML', `'${targetNode.label}' ${connection.type}ed to ${targetNode.value}`);
         }
       }
       appState.impulses = newImpulses;
@@ -207,7 +213,9 @@ function updateApp(event: Event) {
       break;
 
     case 'deleteEdge':
-      appState.data.edges = appState.data.edges.filter(e => e.source !== event.edge.source || e.target !== event.edge.target);
+      appState.data.edges = appState.data.edges.filter(
+        (e) => e.source !== event.edge.source || e.target !== event.edge.target
+      );
       break;
 
     case 'selectEdge':
@@ -262,29 +270,22 @@ function drawNodeForm(selected: AppState['selected']) {
     updateApp({ type: 'renameNode', node: newNode });
   });
 
-  nodeForm
-    .select('button.nodeIncrement')
-    .on('click', () => updateApp({type: 'incrementNode', node: selected}));
+  nodeForm.select('button.nodeIncrement').on('click', () => updateApp({ type: 'incrementNode', node: selected }));
 
-  nodeForm
-    .select('button.nodeDecrement')
-    .on('click', () => updateApp({type: 'decrementNode', node: selected}));
+  nodeForm.select('button.nodeDecrement').on('click', () => updateApp({ type: 'decrementNode', node: selected }));
 
-  nodeForm
-    .select('button.pushImpulsesDownstream')
-    .on('click', () => updateApp({ type: 'pushImpulsesDownstream' }));
+  nodeForm.select('button.pushImpulsesDownstream').on('click', () => updateApp({ type: 'pushImpulsesDownstream' }));
 
   nodeForm.select('button.nodeDeselect').on('click', () => updateApp({ type: 'selectNode', node: undefined }));
-    
+
   nodeForm.select('button.nodeDelete').on('click', () => {
     updateApp({ type: 'deleteNode', node: selected });
   });
 }
 
-
 function drawEdgeForm(selected: AppState['selected']) {
   const edgeForm = select('#edgeForm');
-  
+
   if (!selected || !isEdge(selected)) {
     edgeForm.style('opacity', '0');
     return;
@@ -293,57 +294,57 @@ function drawEdgeForm(selected: AppState['selected']) {
 
   // Populate source dropdown
   const sourceSelect = edgeForm.select('select[name="source"]');
-  sourceSelect.selectAll<HTMLOptionElement, Node>('option')
+  sourceSelect
+    .selectAll<HTMLOptionElement, Node>('option')
     .data(appState.data.nodes, (d: Node) => d.id)
     .join(
-      enter => enter.append('option')
-        .attr('value', d => d.id)
-        .text(d => d.label),
-      update => update
-        .attr('value', d => d.id)
-        .text(d => d.label),
-      exit => exit.remove()
+      (enter) =>
+        enter
+          .append('option')
+          .attr('value', (d) => d.id)
+          .text((d) => d.label),
+      (update) => update.attr('value', (d) => d.id).text((d) => d.label),
+      (exit) => exit.remove()
     );
   sourceSelect.property('value', selected.source);
 
   // Populate target dropdown
   const targetSelect = edgeForm.select('select[name="target"]');
-  targetSelect.selectAll<HTMLOptionElement, Node>('option')
+  targetSelect
+    .selectAll<HTMLOptionElement, Node>('option')
     .data(appState.data.nodes, (d: Node) => d.id)
     .join(
-      enter => enter.append('option')
-        .attr('value', d => d.id)
-        .text(d => d.label),
-      update => update
-        .attr('value', d => d.id)
-        .text(d => d.label),
-      exit => exit.remove()
+      (enter) =>
+        enter
+          .append('option')
+          .attr('value', (d) => d.id)
+          .text((d) => d.label),
+      (update) => update.attr('value', (d) => d.id).text((d) => d.label),
+      (exit) => exit.remove()
     );
   targetSelect.property('value', selected.target);
 
   edgeForm.select('select[name="mode"]').property('value', selected.type);
 
   edgeForm.select('select[name="source"]').on('change', function () {
-      const sourceId = +(this as HTMLSelectElement).value;
-      updateApp({ type: 'updateEdge', edge: { ...selected, source: sourceId } });
-    });
+    const sourceId = +(this as HTMLSelectElement).value;
+    updateApp({ type: 'updateEdge', edge: { ...selected, source: sourceId } });
+  });
 
   edgeForm.select('select[name="target"]').on('change', function () {
-      const targetId = +(this as HTMLInputElement).value;
-      updateApp({ type: 'updateEdge', edge: { ...selected, target: targetId } });
-    });
+    const targetId = +(this as HTMLInputElement).value;
+    updateApp({ type: 'updateEdge', edge: { ...selected, target: targetId } });
+  });
 
-  edgeForm.select('select[name="mode"]')
-    .on('change', function () {
-      const newType = (this as HTMLSelectElement).value as Edge['type'];
-      updateApp({type: 'updateEdge',edge: { ...selected, type: newType }});
-    });
+  edgeForm.select('select[name="mode"]').on('change', function () {
+    const newType = (this as HTMLSelectElement).value as Edge['type'];
+    updateApp({ type: 'updateEdge', edge: { ...selected, type: newType } });
+  });
 
-  edgeForm.select('.edgeDelete').on('click', () => updateApp({type: 'deleteEdge', edge: selected}));
+  edgeForm.select('.edgeDelete').on('click', () => updateApp({ type: 'deleteEdge', edge: selected }));
 
-  edgeForm.select('.edgeDeselect').on('click', () => updateApp({type: 'selectEdge'}));
+  edgeForm.select('.edgeDeselect').on('click', () => updateApp({ type: 'selectEdge' }));
 }
-
 
 select('#nodeCreate').on('click', () =>
   updateApp({
@@ -358,7 +359,6 @@ select('#nodeCreate').on('click', () =>
   })
 );
 
-
 select('#edgeCreate').on('click', () => {
   if (appState.data.nodes.length <= 1) {
     console.warn('create at least two nodes before trying to create a connection.');
@@ -370,39 +370,37 @@ select('#edgeCreate').on('click', () => {
   for (const candidateNode1 of appState.data.nodes) {
     for (const candidateNode2 of appState.data.nodes) {
       if (candidateNode1.id === candidateNode2.id) continue;
-      const connection = appState.data.edges.find(e => e.source === candidateNode1.id && e.target === candidateNode2.id);
+      const connection = appState.data.edges.find(
+        (e) => e.source === candidateNode1.id && e.target === candidateNode2.id
+      );
       if (!connection) {
-        node1 = candidateNode1; 
+        node1 = candidateNode1;
         node2 = candidateNode2;
         break;
       }
     }
   }
   if (!node1 || !node2) {
-    console.log('Fully connected graph. You can\'t create a new edge.');
+    console.log("Fully connected graph. You can't create a new edge.");
     return;
   }
 
-    updateApp({
-      type: 'createEdge',
-      edge: {
-        id: appState.data.edges.length > 0 ? Math.max(...appState.data.edges.map(e => e.id)) + 1 : 1,
-        source: node1.id,
-        target: node2.id,
-        type: 'increment'
-      },
-    })
+  updateApp({
+    type: 'createEdge',
+    edge: {
+      id: appState.data.edges.length > 0 ? Math.max(...appState.data.edges.map((e) => e.id)) + 1 : 1,
+      source: node1.id,
+      target: node2.id,
+      type: 'increment',
+    },
+  });
 });
 
-select('#propagateImpulses').on('click', () => updateApp({type: 'pushImpulsesDownstream'}));
+select('#propagateImpulses').on('click', () => updateApp({ type: 'pushImpulsesDownstream' }));
 
-select('#removeImpulses').on('click', () => updateApp({type: 'removeImpulses'}));
+select('#removeImpulses').on('click', () => updateApp({ type: 'removeImpulses' }));
 
-select('#exportGraph').on('click', () => updateApp({type: 'exportGraph'}));
-
-
-
-
+select('#exportGraph').on('click', () => updateApp({ type: 'exportGraph' }));
 
 /**********************************************
  * SVG Setup
@@ -415,8 +413,7 @@ const viewBoxY = 350;
 const xScale = scaleLinear([0, 1], [0, viewBoxX]);
 const yScale = scaleLinear([0, 1], [0, viewBoxY]);
 
-const rootSvg = select<SVGSVGElement, unknown>('#svg')
-  .attr('viewBox', `0 0 ${viewBoxX} ${viewBoxY}`);
+const rootSvg = select<SVGSVGElement, unknown>('#svg').attr('viewBox', `0 0 ${viewBoxX} ${viewBoxY}`);
 const rootGroup = rootSvg.append('g');
 const defs = rootSvg.append('defs');
 defs
@@ -460,7 +457,6 @@ const dragBreaker = new Breaker<{ evt: DragEvent; node: Node }>(50, ({ evt, node
   updateApp({ type: 'moveNode', node });
 });
 
-
 function wayFraction(graph: Graph, startId: number, targetId: number, fraction: number) {
   const startNode = getNodeById(graph, startId);
   const targetNode = getNodeById(graph, targetId);
@@ -472,7 +468,7 @@ function wayFraction(graph: Graph, startId: number, targetId: number, fraction: 
   const deltaY = targetY - startY;
   const fracX = startX + fraction * deltaX;
   const fracY = startY + fraction * deltaY;
-  return {x: fracX, y: fracY};
+  return { x: fracX, y: fracY };
 }
 
 function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer: number) {
@@ -493,17 +489,22 @@ function wayMinusBuffer(graph: Graph, startId: number, targetId: number, buffer:
 }
 
 function drawGraph(graph: Graph, root: Selection<SVGGElement, unknown, HTMLElement, any>) {
-  const maxVal = Math.max(...graph.nodes.map(n => n.value));
+  const maxVal = Math.max(...graph.nodes.map((n) => n.value));
   const radiusScale = scaleLinear([0, maxVal], [5, 50]).clamp(true);
-
 
   const connections = root
     .selectAll<SVGLineElement, Edge>('.connection')
     .data(graph.edges, (e) => `${e.source}->${e.target}`)
     .attr('x1', (edge) => xScale(getNodeById(graph, edge.source).x))
     .attr('y1', (edge) => yScale(getNodeById(graph, edge.source).y))
-    .attr('x2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, radiusScale(getNodeById(graph, edge.target).value)).x)
-    .attr('y2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, radiusScale(getNodeById(graph, edge.target).value)).y);
+    .attr(
+      'x2',
+      (edge) => wayMinusBuffer(graph, edge.source, edge.target, radiusScale(getNodeById(graph, edge.target).value)).x
+    )
+    .attr(
+      'y2',
+      (edge) => wayMinusBuffer(graph, edge.source, edge.target, radiusScale(getNodeById(graph, edge.target).value)).y
+    );
   connections
     .enter()
     .append('line')
@@ -514,63 +515,87 @@ function drawGraph(graph: Graph, root: Selection<SVGGElement, unknown, HTMLEleme
     .attr('y2', (edge) => wayMinusBuffer(graph, edge.source, edge.target, 15).y)
     .attr('stroke', 'black')
     .attr('marker-end', 'url(#arrow)')
-    .on('click', (_, edge) => updateApp({type: 'selectEdge', edge}));
+    .on('click', (_, edge) => updateApp({ type: 'selectEdge', edge }));
   connections.exit().remove();
 
-
-  const connectionLabelGroups = root.selectAll<SVGGElement, Edge>('.connectionLabel')
+  const connectionLabelGroups = root
+    .selectAll<SVGGElement, Edge>('.connectionLabel')
     .data(graph.edges, (e) => `${e.source}-${e.target}`)
-    .attr('transform', edge => `translate(${wayFraction(graph, edge.source, edge.target, 0.5).x}, ${wayFraction(graph, edge.source, edge.target, 0.5).y})`);
-  connectionLabelGroups.select('text').text(e => e.type === 'increment' ? '+' : '-').attr('transform', 'translate(-4.5, 5)');
-  const connectionLabelsNew = connectionLabelGroups.enter()
+    .attr(
+      'transform',
+      (edge) =>
+        `translate(${wayFraction(graph, edge.source, edge.target, 0.5).x}, ${
+          wayFraction(graph, edge.source, edge.target, 0.5).y
+        })`
+    );
+  connectionLabelGroups
+    .select('text')
+    .text((e) => (e.type === 'increment' ? '+' : '-'))
+    .attr('transform', 'translate(-4.5, 5)');
+  const connectionLabelsNew = connectionLabelGroups
+    .enter()
     .append('g')
     .attr('class', 'connectionLabel')
-    .attr('transform', edge => `translate(${wayFraction(graph, edge.source, edge.target, 0.5).x}, ${wayFraction(graph, edge.source, edge.target, 0.5).y})`);
+    .attr(
+      'transform',
+      (edge) =>
+        `translate(${wayFraction(graph, edge.source, edge.target, 0.5).x}, ${
+          wayFraction(graph, edge.source, edge.target, 0.5).y
+        })`
+    );
   connectionLabelsNew
-    .append('circle').attr('r', 5).attr('fill', 'lightgrey')
-    .on('click', (_, e) => updateApp({type: 'selectEdge', edge: e}));
+    .append('circle')
+    .attr('r', 5)
+    .attr('fill', 'lightgrey')
+    .on('click', (_, e) => updateApp({ type: 'selectEdge', edge: e }));
   connectionLabelsNew
-    .append('text').text(e => e.type === 'increment' ? '+' : '-').attr('transform', 'translate(-4.5, 5)')
-    .on('click', (_, e) => updateApp({type: 'selectEdge', edge: e}));
+    .append('text')
+    .text((e) => (e.type === 'increment' ? '+' : '-'))
+    .attr('transform', 'translate(-4.5, 5)')
+    .on('click', (_, e) => updateApp({ type: 'selectEdge', edge: e }));
   connectionLabelGroups.exit().remove();
-
 
   const nodes = root
     .selectAll<SVGCircleElement, Node>('.node')
     .data(graph.nodes, (d: Node) => d.id)
-    .attr('stroke', (d) => (isSelected(d) ? 'black' : appState.impulses.map(i => i.nodeId).includes(d.id) ? 'blue' : 'none'))
+    .attr('stroke', (d) =>
+      isSelected(d) ? 'black' : appState.impulses.map((i) => i.nodeId).includes(d.id) ? 'blue' : 'none'
+    )
     .attr('cx', (d) => xScale(d.x))
     .attr('cy', (d) => yScale(d.y))
-    .attr('r', d => radiusScale(d.value) + 'px');
+    .attr('r', (d) => radiusScale(d.value) + 'px');
   nodes
     .enter()
     .append('circle')
     .attr('class', 'node')
-    .attr('r', d => radiusScale(d.value) + 'px')
+    .attr('r', (d) => radiusScale(d.value) + 'px')
     .attr('fill', 'grey')
-    .attr('stroke', (d) => (isSelected(d) ? 'black' : appState.impulses.map(i => i.nodeId).includes(d.id) ? 'blue' : 'none'))
+    .attr('stroke', (d) =>
+      isSelected(d) ? 'black' : appState.impulses.map((i) => i.nodeId).includes(d.id) ? 'blue' : 'none'
+    )
     .attr('cx', (d) => xScale(d.x))
     .attr('cy', (d) => yScale(d.y))
     .on('click', (_, node) => updateApp({ type: 'selectNode', node }))
-    .call(drag<SVGCircleElement, Node>().on('drag', (evt, node) => {
+    .call(
+      drag<SVGCircleElement, Node>().on('drag', (evt, node) => {
         node.x += xScale.invert(evt.dx);
         node.y += yScale.invert(evt.dy);
         dragBreaker.enqueue({ evt, node });
-    }));
+      })
+    );
   nodes.exit().remove();
-
 
   const nodeLabels = root
     .selectAll<SVGTextElement, Node>('.nodeLabel')
     .data(graph.nodes, (d) => d.id)
-    .text((el) => el.label + ": " + el.value)
+    .text((el) => el.label + ': ' + el.value)
     .attr('x', (d) => xScale(d.x))
     .attr('y', (d) => yScale(d.y));
   nodeLabels
     .enter()
     .append('text')
     .attr('class', 'nodeLabel')
-    .text((el) => el.label + ": " + el.value)
+    .text((el) => el.label + ': ' + el.value)
     .attr('x', (d) => xScale(d.x))
     .attr('y', (d) => yScale(d.y))
     .on('click', (_, node) => updateApp({ type: 'selectNode', node }));
