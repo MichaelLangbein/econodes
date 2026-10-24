@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + TS</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      h4 {
+        margin: 0.25rem 0 0.25rem 0;
+      }
+      #app {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding: 1rem;
+        position: relative;
+      }
+      .widget {
+        padding: 0.5rem;
+        margin: 0.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid lightgrey;
+        background-color: white;
+        label {
+          margin-right: 0.5rem;
+        }
+      }
+      #formList {
+        display: flex;
+        flex-direction: row;
+        position: absolute;
+        z-index: 10;
+        pointer-events: auto;
+      }
+      .buttons {
+        display: flex;
+        flex-direction: column;
+      }
+      .appContainer {
+        display: flex;
+        flex-direction: row;
+        overflow: auto;
+        position: absolute;
+        width: 100%;
+        height: 100vh;
+        z-index: 0;
+      }
+      .recent-log {
+        background-color: #fff3bf;
+        font-weight: 600;
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-C0z7jB1O.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <div id="formList">
+        <div class="buttons">
+          <button id="nodeCreate" class="widget">Create node</button>
+          <button id="marketCreate" class="widget">Create market</button>
+          <button id="edgeCreate" class="widget">Create edge</button>
+          <button id="distributeNodes" class="widget" type="button">Distribute nodes</button>
+          <button id="undo" class="widget" type="button" disabled>Undo</button>
+          <button id="exportGraph" class="widget">Export graph</button>
+          <button id="propagateImpulses" class="widget">Propagate impulses</button>
+          <button id="removeImpulses" class="widget">Remove impulses</button>
+        </div>
+
+        <form id="distributeNodesForm" class="widget" hidden>
+          <h4>Force layout</h4>
+          <div>
+            <label for="edgeStrength">Edge strength:</label>
+            <input
+              id="edgeStrength"
+              name="edgeStrength"
+              type="number"
+              min="0"
+              max="2"
+              step="0.1"
+              value="0.4"
+              required
+            />
+          </div>
+          <div>
+            <label for="nodeCharge">Node charge:</label>
+            <input id="nodeCharge" name="nodeCharge" type="number" max="0" step="10" value="-550" required />
+          </div>
+          <div>
+            <label for="centerForce">Center force:</label>
+            <input
+              id="centerForce"
+              name="centerForce"
+              type="number"
+              min="0"
+              max="1"
+              step="0.01"
+              value="0.04"
+              required
+            />
+          </div>
+          <button type="submit">Apply layout</button>
+        </form>
+
+        <div id="nodeForm" class="widget">
+          <h4>Node</h4>
+          <div><label for="label">Label:</label><input type="text" name="label" id="label" /></div>
+          <div><label for="">Value:</label><span id="valueSpan"></span></div>
+          <fieldset id="marketConfigForm" hidden>
+            <legend>Market parameters</legend>
+            <div>
+              <label for="demandSlope">Demand slope (quantity per price):</label>
+              <input id="demandSlope" name="demandSlope" type="number" min="0" step="0.01" required />
+            </div>
+            <div>
+              <label for="supplySlope">Supply slope (quantity per price):</label>
+              <input id="supplySlope" name="supplySlope" type="number" min="0" step="0.01" required />
+            </div>
+            <div>
+              <label for="demandChokePrice">Price where quantity demanded reaches zero:</label>
+              <input id="demandChokePrice" name="demandChokePrice" type="number" min="0" step="1" required />
+            </div>
+            <div>
+              <label for="supplyQuantityAtZero">Quantity supplied at price 0:</label>
+              <input
+                id="supplyQuantityAtZero"
+                name="supplyQuantityAtZero"
+                type="number"
+                min="0"
+                step="1"
+                required
+              />
+            </div>
+          </fieldset>
+          <button class="nodeIncrement">+</button>
+          <button class="nodeDecrement">-</button>
+          <button class="nodeDelete">Delete</button>
+          <button class="nodeDeselect">Deselect</button>
+        </div>
+
+        <div id="edgeForm" class="widget">
+          <h4>Edge</h4>
+          <div>
+            <label for="source">Source:</label>
+            <select name="source" id="source"></select>
+          </div>
+          <div>
+            <label for="target">Target:</label>
+            <select name="target" id="target"></select>
+          </div>
+          <div>
+            <label for="mode">Mode:</label>
+            <select name="mode" id="mode">
+              <option value="increment">increment</option>
+              <option value="decrement">decrement</option>
+            </select>
+          </div>
+          <button class="edgeDelete">Delete</button>
+          <button class="edgeDeselect">Deselect</button>
+        </div>
+      </div>
+
+      <div class="appContainer">
+        <svg id="svg" style="flex: 7 1 70%"></svg>
+
+        <div id="logContainer" style="flex: 3 1 30%; display: flex; flex-direction: column; overflow: auto">
+          <h4>Logs</h4>
+          <h4>Scenarios</h4>
+          <div id="scenarioContainer"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
